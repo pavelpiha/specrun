@@ -1,5 +1,5 @@
 {
-  "name": "specrun",
+  "name": "@pavelpiha/specrun",
   "version": "1.3.0",
   "mcpName": "io.github.pavelpiha/specrun",
   "description": "MCP server that converts OpenAPI specs into tools which can query API endpoints",
