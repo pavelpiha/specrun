@@ -1,10 +1,5 @@
 <h1 align="center">
   SpecRun
-
-[![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/ab3b0729-c54e-4359-aed0-606b90995b59)
-![](https://badge.mcpx.dev?status=on "MCP Enabled")
-<img src="https://badge.mcpx.dev?status=on" title="MCP Enabled"/>
-
 </h1>
 An MCP server that turns OpenAPI specifications into MCP tools. Scans a folder for OpenAPI spec files and automatically generate corresponding tools. These tools can then be used in any MCP client to interact with the APIs defined by the specs, with built-in support for authentication and server URL management via a simple `.env` file.
 
