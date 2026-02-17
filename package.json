@@ -1,6 +1,7 @@
 {
   "name": "specrun",
-  "version": "1.1.1",
+  "version": "1.2.0",
+  "mcpName": "io.github.pavelpiha/specrun",
   "description": "An MCP server that converts OpenAPI specifications to MCP tools - scan a folder for spec files and automatically generate corresponding tools",
   "main": "dist/index.js",
   "bin": {
@@ -32,7 +33,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@github.com:pavelpiha/specrun.git"
+    "url": "https://github.com/pavelpiha/specrun.git"
   },
   "files": [
     "dist",
