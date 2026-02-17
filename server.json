@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.pavelpiha/specrun",
-  "description": "An MCP server that converts OpenAPI specifications to MCP tools - scan a folder for spec files and automatically generate corresponding tools",
+  "description": "MCP server that converts OpenAPI specs into tools which can query API endpoints",
   "repository": {
     "url": "https://github.com/pavelpiha/specrun",
     "source": "github"
   },
-  "version": "1.2.0",
+  "version": "1.3.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "specrun",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "transport": {
         "type": "stdio"
       }
