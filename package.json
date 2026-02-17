@@ -1,6 +1,6 @@
 {
-  "name": "@pavelpiha/specrun",
-  "version": "1.4.0",
+  "name": "specrun",
+  "version": "1.5.0",
   "mcpName": "io.github.pavelpiha/specrun",
   "description": "MCP server that converts OpenAPI specs into tools which can query API endpoints",
   "main": "dist/index.js",
@@ -14,7 +14,7 @@
     "dev:watch": "tsx watch src/cli.ts",
     "start": "node dist/cli.js",
     "test": "npm run build && node dist/cli.js --help",
-    "tag": "git tag v1.4.0 && git push origin --tags",
+    "tag": "git tag v1.5.0 && git push origin --tags",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -50,7 +50,7 @@
     "axios": "^1.13.5",
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
-    "fastmcp": "^3.32.0",
+    "fastmcp": "^3.33.0",
     "yaml": "^2.8.2",
     "zod": "^4.3.6"
   },

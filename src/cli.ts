@@ -50,7 +50,9 @@ program
 
       // Handle graceful shutdown
       const shutdown = async () => {
-        console.log("\nShutting down...");
+        if (config.transportType !== "stdio") {
+          console.log("Shutting down...");
+        }
         await server.stop();
         process.exit(0);
       };
