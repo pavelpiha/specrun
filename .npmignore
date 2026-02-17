@@ -1,0 +1,11 @@
+node_modules/
+specs/
+src/
+**/*.ts
+tsconfig.json
+specs_test/
+.vscode/
+.git/
+.github/
+.DS_Store
+.nvmrc

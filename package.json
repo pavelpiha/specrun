@@ -1,0 +1,63 @@
+{
+  "name": "specrun",
+  "version": "1.1.0",
+  "description": "An MCP server that converts OpenAPI specifications to MCP tools - scan a folder for spec files and automatically generate corresponding tools",
+  "main": "dist/index.js",
+  "bin": {
+    "specrun": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "dev": "tsx src/cli.ts",
+    "dev:watch": "tsx watch src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "npm run build && node dist/cli.js --help",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "openapi",
+    "swagger",
+    "api",
+    "tools",
+    "spec",
+    "fastmcp",
+    "run",
+    "execute",
+    "generate"
+  ],
+  "author": "Pavel Piha",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Pavel-Piha/specrun.git"
+  },
+  "files": [
+    "dist",
+    "specs",
+    "README.md",
+    "LICENSE.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "axios": "^1.13.5",
+    "commander": "^14.0.3",
+    "dotenv": "^17.3.1",
+    "fastmcp": "^3.32.0",
+    "yaml": "^2.8.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

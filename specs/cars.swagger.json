@@ -1,0 +1,113 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Cars API",
+    "version": "1.0.0",
+    "description": "A simple API for managing cars"
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com"
+    }
+  ],
+  "paths": {
+    "/cars/{carId}": {
+      "get": {
+        "operationId": "getCarById",
+        "summary": "Find car by ID",
+        "description": "Returns a single car",
+        "parameters": [
+          {
+            "name": "carId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "ID of car to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          },
+          "400": {
+            "description": "Invalid ID supplied"
+          },
+          "404": {
+            "description": "Car not found"
+          }
+        }
+      }
+    },
+    "/cars": {
+      "post": {
+        "operationId": "addCar",
+        "summary": "Add a new car",
+        "description": "Add a new car to the catalog",
+        "requestBody": {
+          "description": "Create a new car in the catalog",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "make",
+                  "model",
+                  "year"
+                ],
+                "properties": {
+                  "make": {
+                    "type": "string",
+                    "example": "Toyota"
+                  },
+                  "model": {
+                    "type": "string",
+                    "example": "Corolla"
+                  },
+                  "year": {
+                    "type": "integer",
+                    "format": "int32",
+                    "example": 2022
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "car status in the catalog",
+                    "enum": [
+                      "available",
+                      "reserved",
+                      "sold"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "405": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/inventory": {
+      "get": {
+        "operationId": "getInventory",
+        "summary": "Returns car inventory by status",
+        "description": "Returns a map of status codes to quantities",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    }
+  },
+  "x-base-url": "https://api.example.com"
+}
