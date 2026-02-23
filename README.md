@@ -194,13 +194,21 @@ The `{API_NAME}` is derived from the filename of your OpenAPI spec:
 
 Tools are automatically named using this pattern:
 
-- **With operationId**: `{api_name}_{operationId}`
-- **Without operationId**: `{api_name}_{method}_{path_segments}`
+- **With operationId**: `{operation_id}`
+- **Without operationId**: `{method}_{path_segments}`
+
+Name normalization rules:
+
+- Converted to `snake_case`
+- Lowercased
+- Non-alphanumeric characters normalized to `_`
+- Truncated at the end when longer than 52 characters. (For VS Code/Copilot compatibility, mcp*specrun*<name> stays within the practical 64-char internal limit.)
+- Adds short suffixes only when needed to resolve collisions
 
 Specs:
 
-- `cars_getCarById` (from operationId)
-- `github_get_user_repos` (generated from `GET /user/repos`)
+- `get_car_by_id` (from operationId)
+- `get_user_repos` (generated from `GET /user/repos`)
 
 Use the shared batch tool to run any tool with an array of inputs:
 

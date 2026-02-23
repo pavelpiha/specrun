@@ -6,6 +6,7 @@ import { ParsedSpec, GeneratedTool, ToolParameter } from "../types";
 import { getApiNameFromFile } from "./auth";
 
 const DEFAULT_SERVER_URL = "https://api-server.placeholder";
+const TOOL_NAME_MAX_LENGTH = 52;
 
 export async function parseOpenApiSpec(
   filePath: string,
@@ -42,6 +43,7 @@ export async function parseOpenApiSpec(
 function generateToolsFromSpec(spec: any, apiName: string): GeneratedTool[] {
   const tools: GeneratedTool[] = [];
   const baseUrl = getBaseUrl(spec);
+  const usedToolNames = new Set<string>();
 
   if (!spec.paths) return tools;
 
@@ -63,13 +65,13 @@ function generateToolsFromSpec(spec: any, apiName: string): GeneratedTool[] {
       if (!operation) continue;
 
       const tool = createToolFromOperation(
-        apiName,
         pathTemplate,
         method,
         operation,
         baseUrl,
         (pathItem as any).parameters,
         spec,
+        usedToolNames,
       );
 
       if (tool) {
@@ -82,16 +84,21 @@ function generateToolsFromSpec(spec: any, apiName: string): GeneratedTool[] {
 }
 
 function createToolFromOperation(
-  apiName: string,
   pathTemplate: string,
   method: string,
   operation: any,
   baseUrl: string,
   pathLevelParams?: any[],
   spec?: any,
+  usedToolNames?: Set<string>,
 ): GeneratedTool | null {
   try {
-    const toolName = generateToolName(apiName, operation, pathTemplate, method);
+    const toolName = generateToolName(
+      operation,
+      pathTemplate,
+      method,
+      usedToolNames,
+    );
     const description =
       operation.summary ||
       operation.description ||
@@ -127,23 +134,105 @@ function createToolFromOperation(
 }
 
 function generateToolName(
-  apiName: string,
   operation: any,
   pathTemplate: string,
   method: string,
+  usedToolNames?: Set<string>,
 ): string {
+  let rawName: string;
   if (operation.operationId) {
-    return `${apiName}_${operation.operationId}`;
+    const normalizedOperationId =
+      normalizeToolNameSegment(String(operation.operationId)) ||
+      normalizeToolNameSegment(`${method}_${pathTemplate}`) ||
+      "operation";
+    rawName = normalizedOperationId;
+  } else {
+    const pathParts = pathTemplate
+      .split("/")
+      .filter((part) => part)
+      .map((part) => {
+        const normalized = normalizeToolNameSegment(part);
+        return normalized || "segment";
+      });
+
+    const pathName = pathParts.join("_") || "root";
+    rawName = `${normalizeToolNameSegment(method) || "method"}_${pathName}`;
   }
 
-  // Generate from path and method
-  const pathParts = pathTemplate
-    .split("/")
-    .filter((part) => part && !part.startsWith("{"))
-    .map((part) => part.replace(/[^a-zA-Z0-9]/g, ""));
+  return finalizeToolName(rawName, usedToolNames);
+}
 
-  const pathName = pathParts.join("_") || "root";
-  return `${apiName}_${method}_${pathName}`;
+function normalizeToolNameSegment(value: string): string {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+}
+
+function finalizeToolName(
+  rawName: string,
+  usedToolNames?: Set<string>,
+): string {
+  const normalizedRawName = normalizeToolNameSegment(rawName) || "tool";
+  const boundedBaseName = boundToolNameLength(normalizedRawName);
+
+  if (!usedToolNames) {
+    return boundedBaseName;
+  }
+
+  if (!usedToolNames.has(boundedBaseName)) {
+    usedToolNames.add(boundedBaseName);
+    return boundedBaseName;
+  }
+
+  let counter = 2;
+  while (counter < 10000) {
+    const candidate = appendSuffixWithinLimit(boundedBaseName, String(counter));
+    if (!usedToolNames.has(candidate)) {
+      usedToolNames.add(candidate);
+      return candidate;
+    }
+    counter += 1;
+  }
+
+  const fallback = appendSuffixWithinLimit("tool", String(Date.now()));
+  usedToolNames.add(fallback);
+  return fallback;
+}
+
+function boundToolNameLength(name: string): string {
+  if (name.length <= TOOL_NAME_MAX_LENGTH) {
+    return name;
+  }
+
+  return name.slice(0, TOOL_NAME_MAX_LENGTH).replace(/_+$/g, "");
+}
+
+function appendSuffixWithinLimit(base: string, suffix: string): string {
+  const normalizedSuffix = normalizeToolNameSegment(suffix);
+  if (!normalizedSuffix) {
+    return boundToolNameLength(base);
+  }
+
+  const joined = `${base}_${normalizedSuffix}`;
+  if (joined.length <= TOOL_NAME_MAX_LENGTH) {
+    return joined;
+  }
+
+  const maxBaseLength = TOOL_NAME_MAX_LENGTH - normalizedSuffix.length - 1;
+  if (maxBaseLength <= 0) {
+    return normalizedSuffix.slice(0, TOOL_NAME_MAX_LENGTH);
+  }
+
+  const trimmedBase = base.slice(0, maxBaseLength).replace(/_+$/g, "");
+  return `${trimmedBase}_${normalizedSuffix}`;
 }
 
 function extractParameters(paramRefs: any[], spec?: any): ToolParameter[] {
