@@ -132,6 +132,22 @@ specrun --specs ~/specs
 specrun --transport httpStream --port 8080
 ```
 
+### Run with Node 22 using npx
+
+If your default `node` is older than 22, run SpecRun with Node 22 directly:
+
+- `npx -y node@22 ...` runs the Node.js runtime, so the next argument must be a script path (for example `./node_modules/.bin/specrun`).
+- `specrun@latest` is an npm package spec and works directly with `npx` only when your current Node version already satisfies SpecRun requirements.
+
+```bash
+
+# Or list tools
+npx -y node@22 ./node_modules/.bin/specrun list --specs ~/specs
+
+# If your default Node is already 22+, this also works
+npx -y specrun@latest --specs ~/specs
+```
+
 ### 📋 List loaded specs and tools
 
 ```bash

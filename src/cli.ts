@@ -2,10 +2,27 @@
 
 import { Command } from "commander";
 import path from "path";
-import { OpenApiMcpServer } from "./server";
-import { ServerConfig } from "./types";
+import type { ServerConfig } from "./types";
 
 const program = new Command();
+
+function ensureSupportedNode(): void {
+  const major = Number.parseInt(process.versions.node.split(".")[0], 10);
+  if (!Number.isNaN(major) && major >= 22) {
+    return;
+  }
+
+  console.error(
+    `SpecRun requires Node.js >= 22. Detected ${process.version}. Run with Node 22, for example: npx -y node@22 ./dist/cli.js --specs /absolute/path/to/specs`,
+  );
+  process.exit(1);
+}
+
+async function createServer(config: ServerConfig) {
+  ensureSupportedNode();
+  const { OpenApiMcpServer } = await import("./server");
+  return new OpenApiMcpServer(config);
+}
 
 program
   .name("specrun")
@@ -46,7 +63,7 @@ program
         process.exit(1);
       }
 
-      const server = new OpenApiMcpServer(config);
+      const server = await createServer(config);
 
       // Handle graceful shutdown
       const shutdown = async () => {
@@ -85,7 +102,7 @@ program
         specsPath,
       };
 
-      const server = new OpenApiMcpServer(config);
+      const server = await createServer(config);
 
       await server.loadSpecs();
 
