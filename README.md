@@ -202,7 +202,7 @@ Name normalization rules:
 - Converted to `snake_case`
 - Lowercased
 - Non-alphanumeric characters normalized to `_`
-- Truncated at the end when longer than 52 characters. (For VS Code/Copilot compatibility, mcp*specrun*<name> stays within the practical 64-char internal limit.)
+- Truncated at the end when longer than 52 characters. (For VS Code/Copilot compatibility, stays within the practical 64-char internal limit.)
 - Adds short suffixes only when needed to resolve collisions
 
 Specs:
@@ -360,8 +360,7 @@ npm install
 # Build
 npm run build
 
-# Test locally
-npm run dev -- --specs ./specs
+npm run dev -- list --specs ./specs
 ```
 
 ## 🤝 Contributing

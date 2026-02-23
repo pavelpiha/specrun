@@ -7,6 +7,7 @@ import { getApiNameFromFile } from "./auth";
 
 const DEFAULT_SERVER_URL = "https://api-server.placeholder";
 const TOOL_NAME_MAX_LENGTH = 52;
+const RESERVED_TOOL_NAMES = new Set<string>(["specrun_batch"]);
 
 export async function parseOpenApiSpec(
   filePath: string,
@@ -43,7 +44,7 @@ export async function parseOpenApiSpec(
 function generateToolsFromSpec(spec: any, apiName: string): GeneratedTool[] {
   const tools: GeneratedTool[] = [];
   const baseUrl = getBaseUrl(spec);
-  const usedToolNames = new Set<string>();
+  const usedToolNames = new Set<string>(RESERVED_TOOL_NAMES);
 
   if (!spec.paths) return tools;
 

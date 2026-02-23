@@ -24,6 +24,28 @@ async function createServer(config: ServerConfig) {
   return new OpenApiMcpServer(config);
 }
 
+function ensureValidTransportRuntime(config: ServerConfig): void {
+  const transportType = config.transportType ?? "stdio";
+  const isStdio = transportType === "stdio";
+  const isInteractiveTerminal =
+    Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
+
+  if (!isStdio || !isInteractiveTerminal) {
+    return;
+  }
+
+  console.error(
+    [
+      "SpecRun stdio transport expects an MCP client over stdin/stdout, not an interactive terminal.",
+      "Use one of these options:",
+      "- Start from an MCP client configuration (recommended)",
+      "- Run HTTP mode for manual testing: npm run dev -- --transport httpStream --port 8080 --specs /absolute/path/to/specs",
+      "- List tools without starting MCP transport: npm run dev -- list --specs /absolute/path/to/specs",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 program
   .name("specrun")
   .description(
@@ -62,6 +84,8 @@ program
         );
         process.exit(1);
       }
+
+      ensureValidTransportRuntime(config);
 
       const server = await createServer(config);
 
