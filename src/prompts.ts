@@ -87,6 +87,8 @@ export class PromptRegistrar {
 
     const completeToolNames = async (value: string, _auth: unknown) =>
       this.completeToolNames(value);
+    const completePostToolNames = async (value: string, _auth: unknown) =>
+      this.completePostToolNames(value);
 
     this.fastMCP.addPrompt({
       name: "generate_api_call",
@@ -209,6 +211,165 @@ export class PromptRegistrar {
             {
               role: "user",
               content: { type: "text", text },
+            },
+          ],
+        };
+      },
+    });
+
+    this.fastMCP.addPrompt({
+      name: "generate_random_data",
+      description:
+        "Generate random, ready-to-run JSON payload samples for a tool.",
+      arguments: [
+        {
+          name: "tool_name",
+          description: "Exact SpecRun POST tool name.",
+          required: true,
+          complete: completePostToolNames,
+        },
+        {
+          name: "count",
+          description:
+            "Number of random payload samples to generate (default 1).",
+          required: false,
+        },
+        {
+          name: "include_optional",
+          description:
+            "Include optional fields in generated payloads (default false).",
+          required: false,
+        },
+      ],
+      load: async (args: Record<string, any>) => {
+        const toolNameResult = this.parsePostToolNameArg(args?.tool_name);
+        if (!toolNameResult.ok) {
+          return {
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: toolNameResult.error },
+              },
+            ],
+          };
+        }
+
+        const countResult = this.parseRandomCountArg(args?.count);
+        if (!countResult.ok) {
+          return {
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: countResult.error },
+              },
+            ],
+          };
+        }
+
+        const includeOptionalResult = this.parseIncludeOptionalArg(
+          args?.include_optional,
+        );
+        if (!includeOptionalResult.ok) {
+          return {
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: includeOptionalResult.error },
+              },
+            ],
+          };
+        }
+
+        const toolName = toolNameResult.toolName;
+        const entry = this.toolRegistry.get(toolName);
+        if (!entry) {
+          return {
+            messages: [
+              {
+                role: "user",
+                content: {
+                  type: "text",
+                  text: `Unknown tool: ${this.sanitizePromptText(
+                    toolName,
+                  )}. Ask the user to choose a valid tool name.`,
+                },
+              },
+            ],
+          };
+        }
+
+        const lines: string[] = [];
+        lines.push(
+          `Tool: ${this.sanitizePromptText(entry.tool.name)}`,
+          `Method: ${this.sanitizePromptText(
+            entry.tool.method,
+          )} ${this.sanitizePromptText(entry.tool.path)}`,
+          "",
+          this.buildRequiredOptionalSummary(entry.tool),
+        );
+
+        if (!includeOptionalResult.includeOptional) {
+          lines.push(
+            "",
+            "Generation mode: required fields only.",
+            "If you want optional fields too, rerun with include_optional: true.",
+          );
+        }
+
+        if (countResult.count === 1) {
+          const sample = this.buildRandomPayload(
+            entry.tool,
+            1,
+            includeOptionalResult.includeOptional,
+          );
+          lines.push(
+            "",
+            "Random payload sample:",
+            "```json",
+            JSON.stringify(sample, null, 2),
+            "```",
+          );
+        } else {
+          const items: Record<string, any>[] = [];
+          for (let i = 0; i < countResult.count; i++) {
+            items.push(
+              this.buildRandomPayload(
+                entry.tool,
+                i + 1,
+                includeOptionalResult.includeOptional,
+              ),
+            );
+          }
+
+          const batchInput = {
+            toolName: entry.tool.name,
+            items,
+            failFast: false,
+          };
+
+          lines.push(
+            "",
+            `Batch input for specrun_batch (${countResult.count} items):`,
+            "```json",
+            JSON.stringify(batchInput, null, 2),
+            "```",
+            "Run specrun_batch with this payload.",
+          );
+
+          if (countResult.count > 200) {
+            lines.push(
+              "For batches over 200 items, specrun_batch will require confirmLargeBatch and confirmLargeBatchToken.",
+            );
+          }
+        }
+
+        lines.push("", "Adjust values if needed before running the tool.");
+
+        return {
+          messages: [
+            {
+              role: "user",
+              content: { type: "text", text: lines.join("\n") },
             },
           ],
         };
@@ -359,6 +520,78 @@ export class PromptRegistrar {
     }
 
     return { ok: true, toolName: normalized };
+  }
+
+  private parsePostToolNameArg(
+    value: unknown,
+  ): { ok: true; toolName: string } | { ok: false; error: string } {
+    const base = this.parseToolNameArg(value);
+    if (!base.ok) {
+      return base;
+    }
+
+    const entry = this.toolRegistry.get(base.toolName);
+    if (!entry || String(entry.tool.method || "").toUpperCase() !== "POST") {
+      return {
+        ok: false,
+        error: "tool_name must match an available POST tool name.",
+      };
+    }
+
+    return base;
+  }
+
+  private parseRandomCountArg(
+    value: unknown,
+  ): { ok: true; count: number } | { ok: false; error: string } {
+    if (value === undefined || value === null || value === "") {
+      return { ok: true, count: 1 };
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return {
+        ok: false,
+        error: "count must be a positive integer.",
+      };
+    }
+
+    const count = Math.floor(parsed);
+    if (count < 1) {
+      return {
+        ok: false,
+        error: "count must be a positive integer.",
+      };
+    }
+
+    return { ok: true, count };
+  }
+
+  private parseIncludeOptionalArg(
+    value: unknown,
+  ): { ok: true; includeOptional: boolean } | { ok: false; error: string } {
+    if (value === undefined || value === null || value === "") {
+      return { ok: true, includeOptional: false };
+    }
+
+    if (typeof value === "boolean") {
+      return { ok: true, includeOptional: value };
+    }
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "y"].includes(normalized)) {
+        return { ok: true, includeOptional: true };
+      }
+      if (["false", "0", "no", "n"].includes(normalized)) {
+        return { ok: true, includeOptional: false };
+      }
+    }
+
+    return {
+      ok: false,
+      error: "include_optional must be true or false.",
+    };
   }
 
   private normalizeToolName(value: string): string {
@@ -516,6 +749,31 @@ export class PromptRegistrar {
     return { values: matches.slice(0, 50), total: matches.length };
   }
 
+  private completePostToolNames(value: string): {
+    values: string[];
+    total: number;
+  } {
+    const normalized = String(value || "").toLowerCase();
+    const names = this.getPostToolEntries()
+      .map((entry) => entry.tool.name)
+      .sort();
+    const matches = normalized
+      ? names.filter((name) => name.toLowerCase().includes(normalized))
+      : names;
+
+    return { values: matches.slice(0, 50), total: matches.length };
+  }
+
+  private getPostToolEntries(filter?: string): Array<{
+    spec: ParsedSpec;
+    tool: GeneratedTool;
+    schema: z.ZodObject<any>;
+  }> {
+    return this.getToolEntries(filter).filter(
+      (entry) => String(entry.tool.method || "").toUpperCase() === "POST",
+    );
+  }
+
   private buildRequiredOptionalSummary(tool: GeneratedTool): string {
     const required = tool.parameters.filter((param) => param.required);
     const optional = tool.parameters.filter((param) => !param.required);
@@ -557,6 +815,41 @@ export class PromptRegistrar {
     const requestBodySchema = this.getRequestBodySchema(tool.requestBody);
     if (requestBodySchema) {
       payload.body = this.createExampleValue(requestBodySchema, 0);
+    }
+
+    return payload;
+  }
+
+  private buildRandomPayload(
+    tool: GeneratedTool,
+    sequence: number,
+    includeOptional: boolean,
+  ): Record<string, any> {
+    const payload: Record<string, any> = {};
+    const namingContext: RandomNamingContext = {
+      objectName: this.deriveObjectName(tool),
+      timestampMs: Date.now(),
+      sequence,
+    };
+
+    for (const param of tool.parameters) {
+      if (!includeOptional && !param.required) {
+        continue;
+      }
+      payload[param.name] = this.createRandomValue(param.schema, 0, {
+        fieldName: param.name,
+        namingContext,
+        includeOptional,
+      });
+    }
+
+    const requestBodySchema = this.getRequestBodySchema(tool.requestBody);
+    if (requestBodySchema) {
+      payload.body = this.createRandomValue(requestBodySchema, 0, {
+        fieldName: "body",
+        namingContext,
+        includeOptional,
+      });
     }
 
     return payload;
@@ -719,6 +1012,323 @@ export class PromptRegistrar {
     return null;
   }
 
+  private createRandomValue(
+    schema: any,
+    depth: number,
+    options?: {
+      fieldName?: string;
+      namingContext?: RandomNamingContext;
+      includeOptional?: boolean;
+    },
+  ): any {
+    if (depth > 4) {
+      return null;
+    }
+
+    if (!schema || typeof schema !== "object") {
+      return null;
+    }
+
+    if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+      const index = Math.floor(Math.random() * schema.enum.length);
+      return schema.enum[index];
+    }
+
+    const type = schema.type;
+    if (type === "string") {
+      if (
+        options?.namingContext &&
+        this.isNameLikeField(options.fieldName) &&
+        !schema.format
+      ) {
+        return this.buildGeneratedName(schema, options.namingContext);
+      }
+
+      if (schema.format === "uuid") {
+        return this.randomUuid();
+      }
+      if (schema.format === "email") {
+        return `user${this.randomInt(1000, 9999)}@example.com`;
+      }
+      if (schema.format === "date-time") {
+        return new Date(
+          Date.now() - this.randomInt(0, 365 * 24 * 3600 * 1000),
+        ).toISOString();
+      }
+      if (schema.format === "date") {
+        return new Date(Date.now() - this.randomInt(0, 365 * 24 * 3600 * 1000))
+          .toISOString()
+          .slice(0, 10);
+      }
+
+      const minLength = Number.isFinite(Number(schema.minLength))
+        ? Math.max(1, Number(schema.minLength))
+        : 6;
+      const maxLength = Number.isFinite(Number(schema.maxLength))
+        ? Math.max(minLength, Math.min(24, Number(schema.maxLength)))
+        : Math.max(minLength, 12);
+      const targetLength = this.randomInt(minLength, maxLength);
+
+      return this.randomAlphaNumeric(targetLength);
+    }
+
+    if (type === "integer") {
+      const min = Number.isFinite(Number(schema.minimum))
+        ? Math.ceil(Number(schema.minimum))
+        : 0;
+      const max = Number.isFinite(Number(schema.maximum))
+        ? Math.floor(Number(schema.maximum))
+        : min + 1000;
+      return this.randomInt(min, Math.max(min, max));
+    }
+
+    if (type === "number") {
+      const min = Number.isFinite(Number(schema.minimum))
+        ? Number(schema.minimum)
+        : 0;
+      const max = Number.isFinite(Number(schema.maximum))
+        ? Number(schema.maximum)
+        : min + 1000;
+      const random = min + Math.random() * Math.max(0, max - min);
+      return Number(random.toFixed(2));
+    }
+
+    if (type === "boolean") {
+      return Math.random() >= 0.5;
+    }
+
+    if (type === "array") {
+      const minItems = Number.isFinite(Number(schema.minItems))
+        ? Math.max(1, Number(schema.minItems))
+        : 1;
+      const maxItems = Number.isFinite(Number(schema.maxItems))
+        ? Math.max(minItems, Math.min(5, Number(schema.maxItems)))
+        : Math.max(minItems, 2);
+      const count = this.randomInt(minItems, maxItems);
+      const items = [];
+      for (let i = 0; i < count; i++) {
+        items.push(
+          this.createRandomValue(schema.items || {}, depth + 1, {
+            fieldName: options?.fieldName,
+            namingContext: options?.namingContext,
+            includeOptional: options?.includeOptional,
+          }),
+        );
+      }
+      return items;
+    }
+
+    if (type === "object" || schema.properties) {
+      const properties = schema.properties || {};
+      const allowedEntries = Object.entries(properties).filter(
+        ([, value]) => !this.isReadOnlySchema(value),
+      );
+      const required = new Set<string>(
+        (schema.required || []).filter(
+          (key: string) => !this.isReadOnlySchema(properties[key]),
+        ),
+      );
+      const result: Record<string, any> = {};
+
+      for (const [key, value] of allowedEntries) {
+        const include = required.has(key) || Boolean(options?.includeOptional);
+        if (!include) {
+          continue;
+        }
+        result[key] = this.createRandomValue(value, depth + 1, {
+          fieldName: key,
+          namingContext: options?.namingContext,
+          includeOptional: options?.includeOptional,
+        });
+      }
+
+      if (
+        Object.keys(result).length === 0 &&
+        Boolean(options?.includeOptional)
+      ) {
+        const fallbackKey = allowedEntries[0]?.[0];
+        if (fallbackKey) {
+          result[fallbackKey] = this.createRandomValue(
+            properties[fallbackKey],
+            depth + 1,
+            {
+              fieldName: fallbackKey,
+              namingContext: options?.namingContext,
+              includeOptional: options?.includeOptional,
+            },
+          );
+        }
+      }
+
+      return result;
+    }
+
+    if (schema.items) {
+      return [
+        this.createRandomValue(schema.items, depth + 1, {
+          fieldName: options?.fieldName,
+          namingContext: options?.namingContext,
+          includeOptional: options?.includeOptional,
+        }),
+      ];
+    }
+
+    return null;
+  }
+
+  private randomInt(min: number, max: number): number {
+    const safeMin = Math.floor(min);
+    const safeMax = Math.floor(max);
+    if (safeMax <= safeMin) {
+      return safeMin;
+    }
+    return Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
+  }
+
+  private randomAlphaNumeric(length: number): string {
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      const idx = this.randomInt(0, chars.length - 1);
+      result += chars[idx];
+    }
+    return result;
+  }
+
+  private randomUuid(): string {
+    const part = (size: number) => {
+      let s = "";
+      for (let i = 0; i < size; i++) {
+        s += this.randomInt(0, 15).toString(16);
+      }
+      return s;
+    };
+
+    return `${part(8)}-${part(4)}-4${part(3)}-${(8 + this.randomInt(0, 3)).toString(16)}${part(3)}-${part(12)}`;
+  }
+
+  private deriveObjectName(tool: GeneratedTool): string {
+    const segments = String(tool.path || "")
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter(
+        (segment) =>
+          segment && !segment.startsWith("{") && !segment.endsWith("}"),
+      );
+
+    const raw = segments.length > 0 ? segments[segments.length - 1] : tool.name;
+    const normalized = String(raw)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "")
+      .trim();
+
+    if (!normalized) {
+      return "item";
+    }
+
+    if (normalized.endsWith("s") && normalized.length > 1) {
+      return normalized.slice(0, -1);
+    }
+
+    return normalized;
+  }
+
+  private isNameLikeField(fieldName?: string): boolean {
+    const key = String(fieldName || "").toLowerCase();
+    if (!key) {
+      return false;
+    }
+
+    return ["name", "label", "title", "displayname"].some((token) =>
+      key.includes(token),
+    );
+  }
+
+  private buildGeneratedName(
+    schema: any,
+    namingContext: RandomNamingContext,
+  ): string {
+    const delimiter = this.isDashAllowedInStringSchema(schema) ? "-" : "";
+    const objectName = String(namingContext.objectName || "item").replace(
+      /[^a-zA-Z0-9]/g,
+      "",
+    );
+    const datePart = String(namingContext.timestampMs);
+    const sequencePart = String(namingContext.sequence);
+
+    const withObject = objectName
+      ? `ai${delimiter}${objectName}${delimiter}${datePart}${delimiter}${sequencePart}`
+      : `ai${delimiter}${datePart}${delimiter}${sequencePart}`;
+    const withoutObject = `ai${delimiter}${datePart}${delimiter}${sequencePart}`;
+
+    const maxLength = Number.isFinite(Number(schema?.maxLength))
+      ? Math.max(1, Math.floor(Number(schema.maxLength)))
+      : null;
+    const minLength = Number.isFinite(Number(schema?.minLength))
+      ? Math.max(0, Math.floor(Number(schema.minLength)))
+      : 0;
+
+    let candidate = withObject;
+
+    if (maxLength !== null && candidate.length > maxLength) {
+      candidate = withoutObject;
+    }
+
+    if (maxLength !== null && candidate.length > maxLength) {
+      candidate = candidate.slice(0, maxLength);
+    }
+
+    if (!this.matchesStringPattern(schema, candidate)) {
+      const compact = candidate.replace(/[^a-zA-Z0-9]/g, "");
+      if (compact && this.matchesStringPattern(schema, compact)) {
+        candidate = compact;
+      } else {
+        const fallbackLength =
+          maxLength !== null
+            ? Math.max(minLength || 1, Math.min(maxLength, 12))
+            : Math.max(minLength || 1, 12);
+        candidate = this.randomAlphaNumeric(fallbackLength);
+      }
+    }
+
+    if (candidate.length < minLength) {
+      const pad = this.randomAlphaNumeric(minLength - candidate.length);
+      candidate = `${candidate}${pad}`;
+    }
+
+    return candidate;
+  }
+
+  private isDashAllowedInStringSchema(schema: any): boolean {
+    if (!schema || typeof schema !== "object" || !schema.pattern) {
+      return true;
+    }
+
+    try {
+      const regex = new RegExp(String(schema.pattern));
+      return regex.test("a-a");
+    } catch {
+      return true;
+    }
+  }
+
+  private matchesStringPattern(schema: any, value: string): boolean {
+    if (!schema || typeof schema !== "object" || !schema.pattern) {
+      return true;
+    }
+
+    try {
+      const regex = new RegExp(String(schema.pattern));
+      return regex.test(value);
+    } catch {
+      return true;
+    }
+  }
+
+  private isReadOnlySchema(schema: any): boolean {
+    return Boolean(schema && typeof schema === "object" && schema.readOnly);
+  }
+
   private getRequestBodySchema(requestBody: any): any | null {
     if (!requestBody || typeof requestBody !== "object") {
       return null;
@@ -740,3 +1350,9 @@ export class PromptRegistrar {
     return first?.schema || null;
   }
 }
+
+type RandomNamingContext = {
+  objectName: string;
+  timestampMs: number;
+  sequence: number;
+};

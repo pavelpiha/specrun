@@ -263,9 +263,12 @@ your-project/
 
 SpecRun exposes MCP prompts for common workflows:
 
+Detailed prompt guide with examples: [PROMPTS_README.md](PROMPTS_README.md)
+
 - `list_apis`: List loaded APIs/tools and ask the user to choose an endpoint
 - `generate_api_call`: Generate a ready-to-run JSON input payload for a tool
 - `explain_api_schema`: Explain parameters and request body schema with examples
+- `generate_random_data`: Generate random ready-to-run JSON payload samples for a tool
 
 ## 📄 Example OpenAPI Spec
 
